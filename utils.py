@@ -6,7 +6,7 @@ import numpy as np
 import librosa
 import faiss
 
-def extract_features(file_path: str, scaler=None) -> np.ndarray:
+def extract_features(file_path: str) -> np.ndarray:
     y, sr = librosa.load(file_path, duration=60)
     mfccs = librosa.feature.mfcc(y=y, sr=sr)
     chroma = librosa.feature.chroma_stft(y=y, sr=sr)
@@ -14,7 +14,11 @@ def extract_features(file_path: str, scaler=None) -> np.ndarray:
 
     features = np.vstack([mfccs, chroma, spectral_contrast])
 
-    return np.mean(features, axis=1)
+    mean = np.mean(features, axis=1, keepdims=True)
+    std = np.std(features, axis=1, keepdims=True)
+    scaled_features = (features - mean) / std
+
+    return scaled_features.astype(np.float32)
 
 def create_index(feature_dim: np.ndarray) -> faiss.IndexFlatL2:
     index = faiss.IndexFlatL2(feature_dim)
@@ -46,20 +50,26 @@ for i, song in enumerate(os.listdir("music_files/"), start=1):
 
 download_video(video_url="https://www.youtube.com/watch?v=qFLhGq0060w&ab_channel=TheWeekndVEVO", output_folder="inference_music_files")
 user_input_features = extract_features(os.path.join("inference_music_files",os.listdir("inference_music_files")[0]))
-
-feature_dim = len(user_input_features)
+print(user_input_features.shape)
+feature_dim = user_input_features.shape[1]
 index = create_index(feature_dim)
+print(index.d)
 
 for song, file_path in music_db.items():
     song_features = extract_features(os.path.join("music_files",file_path))
+
     add_vectors(index, song_features)
 
-k = 2  # Top 2 recommendations
-distances, indices = search_similar_music(index, user_input_features, k=k)
+k = 5  # Top 5 recommendations
+distances, indices = search_similar_music(index, user_input_features.astype(np.float32), k=k)
 top_recommendations = [list(music_db.keys())[i] for i in indices[0]]
 
-print("Top 2 recommended songs:")
-for i, idx in enumerate(top_recommendations, 1):
+print("Top 5 recommended songs:")
+
+recommendations_with_scores = list(zip(indices[0], distances[0]))
+
+sorted_recommendations = sorted(recommendations_with_scores, key=lambda x: x[1], reverse=True)
+
+for i, (idx, similarity_score) in enumerate(sorted_recommendations[:k], 1):
     song_name = music_db[idx]
-    similarity_score = distances[0][i-1]  # Since i starts from 1
     print(f"{i}. Song: {song_name}, Similarity Score: {similarity_score:.4f}")
