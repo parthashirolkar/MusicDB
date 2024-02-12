@@ -103,6 +103,9 @@ venv.bak/
 # mypy
 .mypy_cache/
 
-# Music Files
+# Music Folders
 inference_music_files/
 music_files/
+
+# Index Folders
+indexes/

@@ -1,4 +1,6 @@
 import os
+import time
+import argparse
 from pytube import YouTube, Playlist
 from pytube.cli import on_progress
 from pydub import AudioSegment
@@ -7,9 +9,7 @@ from concurrent.futures import ThreadPoolExecutor
 def download_playlist(playlist_url, output_folder):
     playlist = Playlist(playlist_url)
     
-    
     with ThreadPoolExecutor(max_workers=os.cpu_count()) as executor:
-        
         executor.map(download_video, playlist.video_urls, [output_folder]*len(playlist.video_urls))
 
 def download_video(video_url, output_folder):
@@ -19,18 +19,20 @@ def download_video(video_url, output_folder):
     output_file = os.path.join(output_folder, f"{youtube.title}.mp3")
     video_stream.download(output_folder)
     
-    
     audio = AudioSegment.from_file(os.path.join(output_folder, video_stream.default_filename), format="mp4")
     audio.export(output_file, format="mp3")
-    
-    
-    print(f"{youtube.title} downloaded and converted to MP3.")
+    [os.remove(os.path.join(output_folder,file)) for file in os.listdir(output_folder) if file.endswith(".mp4")]
+    print(f"{youtube.title} downloaded and converted to MP3.\n")
 
 if __name__ == "__main__":
-    
-    playlist_url = "https://youtube.com/playlist?list=PLMC9KNkIncKtPzgY-5rmhvj7fax8fdxoj&si=Zw7S450__EF3oiRB"
-    output_folder = "music_files"
+    parser = argparse.ArgumentParser(description="Download and convert a YouTube playlist to MP3.")
+    parser.add_argument("playlist_url", help="URL of the YouTube playlist")
+    parser.add_argument("output_folder", help="Output folder for downloaded and converted files")
 
-    download_playlist(playlist_url, output_folder)
+    args = parser.parse_args()
+    start_time = time.perf_counter()
+    download_playlist(args.playlist_url, args.output_folder)
+    
     # Remove all the mp4 files after they have been converted to mp3
-    os.system("rm -rf music_files/*.mp4")
+    os.system(f"rm -rf {args.output_folder}/*.mp4")
+    print(f"Running time of the script: {round(time.perf_counter() - start_time, 3)}")
