@@ -76,7 +76,7 @@ def create_music_embeddings(mfccs: torch.tensor) -> torch.tensor:
 
 
 
-for i, song in enumerate(os.listdir("music_files/")[:20], start=1):
+for i, song in enumerate(os.listdir("music_files/"), start=1):
     print(f"Processing song {i}: {song}")
     file_path = os.path.join("music_files/", song)
     mfccs = preprocess_music(file_path)
