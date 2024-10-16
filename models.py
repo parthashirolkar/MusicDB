@@ -36,3 +36,33 @@ class BiLSTMSeq2Seq(nn.Module):
         x = self.decoder(x)
         output = self.output_layer(x)
         return output
+    
+class Autoencoder(nn.Module):
+    def __init__(self):
+        super(Autoencoder, self).__init__()
+        # Encoder
+        self.encoder = nn.Sequential(
+            nn.Conv1d(1, 64, kernel_size=3, stride=2, padding=1),  # (batch_size, 64, seq_len/2)
+            nn.LeakyReLU(inplace=True),
+            nn.Conv1d(64, 128, kernel_size=3, stride=2, padding=1),  # (batch_size, 128, seq_len/4)
+            nn.LeakyReLU(inplace=True),
+            nn.Conv1d(128, 256, kernel_size=3, stride=2, padding=1),  # (batch_size, 256, seq_len/8)
+            nn.LeakyReLU(inplace=True),
+            nn.Conv1d(256, 512, kernel_size=3, stride=2, padding=1),  # (batch_size, 512, seq_len/16)
+            nn.LeakyReLU(inplace=True)
+        )
+        # Decoder
+        self.decoder = nn.Sequential(
+            nn.ConvTranspose1d(512, 256, kernel_size=3, stride=2, padding=1, output_padding=1),  # (batch_size, 256, seq_len/8)
+            nn.LeakyReLU(inplace=True),
+            nn.ConvTranspose1d(256, 128, kernel_size=3, stride=2, padding=1, output_padding=1),  # (batch_size, 128, seq_len/4)
+            nn.LeakyReLU(inplace=True),
+            nn.ConvTranspose1d(128, 64, kernel_size=3, stride=2, padding=1, output_padding=1),  # (batch_size, 64, seq_len/2)
+            nn.LeakyReLU(inplace=True),
+            nn.ConvTranspose1d(64, 1, kernel_size=3, stride=2, padding=1, output_padding=1),  # (batch_size, 1, seq_len)
+        )
+
+    def forward(self, x):
+        x = self.encoder(x)
+        x = self.decoder(x)
+        return x

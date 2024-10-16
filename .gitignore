@@ -109,3 +109,9 @@ music_files/
 
 # Index Folders
 indexes/
+lightning_logs/
+*.npz
+dev-data/
+feat_extract_v2.ipynb
+notebooks/
+model-weights/
