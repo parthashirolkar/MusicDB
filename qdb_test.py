@@ -1,3 +1,5 @@
+"""Implement PANN inference to create audio embeddings."""
+
 import os
 from utils import *
 import warnings
