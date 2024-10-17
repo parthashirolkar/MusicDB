@@ -1,31 +1,27 @@
 import os
-from utils import *
-import warnings
-warnings.filterwarnings("ignore", category=FutureWarning)
+import numpy as np
+from utils import read_preprocess_music
 from dotenv import load_dotenv
-from models import BiLSTMSeq2Seq
-import torch
 from qdrant_client import QdrantClient
+from panns_inference import AudioTagging
 
 load_dotenv()
 
 
 client = QdrantClient(os.getenv("QDB_ENDPOINT"), api_key=os.getenv("QDB_API_TOKEN"))
 
-device = "cuda" if torch.cuda.is_available() else "cpu"
-model = BiLSTMSeq2Seq(input_dim=50, hidden_dim_1=64, hidden_dim_2=256).to(device)
-model.load_state_dict(torch.load("model_weights.pth", map_location=device, weights_only=True))
+at = AudioTagging(checkpoint_path=None, device='cuda')
 
-selected_file = os.listdir("inference_music_files")[-1]
-user_input = preprocess_music(os.path.join("inference_music_files",selected_file))
+selected_file = os.listdir("inference_music_files")[0]
+user_input = read_preprocess_music(os.path.join("inference_music_files", selected_file))
+
 print("User input song: ", selected_file)
-
-user_input = pad_and_truncate_sequences(user_input, maxlen=5000, padding_value=0.0)
-user_embeddings = create_music_embeddings(user_input, model)
+(_, user_embedding) = at.inference(user_input)
+user_embedding = np.squeeze(user_embedding, axis=0)
 
 search_result = client.search(
-    collection_name="test_collection",
-    query_vector=user_embeddings.tolist(),
+    collection_name="panns_collection",
+    query_vector=user_embedding.tolist(),
     limit=5
 )
 
