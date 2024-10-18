@@ -1,4 +1,6 @@
 import os
+import warnings
+warnings.simplefilter(action='ignore', category=FutureWarning)
 import numpy as np
 from utils import read_preprocess_music
 from dotenv import load_dotenv
@@ -21,7 +23,7 @@ user_embedding = np.squeeze(user_embedding, axis=0)
 
 search_result = client.search(
     collection_name="panns_collection",
-    query_vector=user_embedding.tolist(),
+    query_vector=user_embedding,
     limit=5
 )
 
