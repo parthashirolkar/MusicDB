@@ -12,7 +12,7 @@ from qdrant_client.http.models import PointStruct
 
 load_dotenv()
 
-client = create_quadrant_collection(collection_name="panns_collection", dim=2048)
+client = create_quadrant_collection(collection_name="song_vector_collection", embedding_size=2048)
 
 at = AudioTagging(checkpoint_path=None, device='cuda')
 
@@ -28,7 +28,7 @@ for i, song in enumerate(os.listdir("music_files/"), start=1):
     embedding = np.squeeze(embedding, axis=0)
 
     operation_info = client.upsert(
-        collection_name="panns_collection",
+        collection_name="song_vector_collection",
         wait=True,
         points=[
             PointStruct(id=i, vector=embedding.tolist(), payload={"song_name": song}),

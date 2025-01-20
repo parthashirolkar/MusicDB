@@ -14,7 +14,7 @@ client = QdrantClient(os.getenv("QDB_ENDPOINT"), api_key=os.getenv("QDB_API_TOKE
 
 at = AudioTagging(checkpoint_path=None, device='cuda')
 
-selected_file = os.listdir("inference_music_files")[0]
+selected_file = os.listdir("inference_music_files")[-1]
 user_input = read_preprocess_music(os.path.join("inference_music_files", selected_file))
 
 print("User input song: ", selected_file)
@@ -22,7 +22,7 @@ print("User input song: ", selected_file)
 user_embedding = np.squeeze(user_embedding, axis=0)
 
 search_result = client.search(
-    collection_name="panns_collection",
+    collection_name="song_vector_collection",
     query_vector=user_embedding,
     limit=5
 )
