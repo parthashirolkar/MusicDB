@@ -1,6 +1,7 @@
 import os
 import warnings
-warnings.simplefilter(action='ignore', category=FutureWarning)
+
+warnings.simplefilter(action="ignore", category=FutureWarning)
 from utils import read_preprocess_music, create_quadrant_collection
 import numpy as np
 from dotenv import load_dotenv
@@ -12,9 +13,11 @@ from qdrant_client.http.models import PointStruct
 
 load_dotenv()
 
-client = create_quadrant_collection(collection_name="song_vector_collection", embedding_size=2048)
+client = create_quadrant_collection(
+    collection_name="song_vector_collection", embedding_size=2048
+)
 
-at = AudioTagging(checkpoint_path=None, device='cuda')
+at = AudioTagging(checkpoint_path=None, device="cuda")
 
 
 # PANNS Inference
@@ -32,7 +35,7 @@ for i, song in enumerate(os.listdir("music_files/"), start=1):
         wait=True,
         points=[
             PointStruct(id=i, vector=embedding.tolist(), payload={"song_name": song}),
-        ]
+        ],
     )
 
 client.close()

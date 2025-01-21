@@ -17,6 +17,7 @@ def read_preprocess_music(file_path: str) -> np.ndarray:
 
     return audio
 
+
 def create_quadrant_collection(collection_name: str, embedding_size: int):
     client = QdrantClient(os.getenv("QDB_ENDPOINT"), api_key=os.getenv("QDB_API_TOKEN"))
 
@@ -24,7 +25,7 @@ def create_quadrant_collection(collection_name: str, embedding_size: int):
         return client  # Collection already exists, return the client object
 
     client.create_collection(
-            collection_name=collection_name,
-            vectors_config=VectorParams(size=embedding_size, distance=Distance.COSINE),
+        collection_name=collection_name,
+        vectors_config=VectorParams(size=embedding_size, distance=Distance.COSINE),
     )
     return client  # Return the client object after creating the collection
