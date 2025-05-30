@@ -1,41 +1,54 @@
 import os
+import uuid
+from glob import glob
+import numpy as np
 import warnings
+from torch.utils.data import Dataset, DataLoader
+import torch
+import torch.multiprocessing as mp
+from tqdm import tqdm
+from qdrant_client import QdrantClient
+import librosa  # Add this import at the top
+import numpy as np  # Add this import for numpy operations
 
 warnings.simplefilter(action="ignore", category=FutureWarning)
-from utils import read_preprocess_music, create_quadrant_collection
-import numpy as np
+from utils import feature_extractor, create_quadrant_collection, model, read_preprocess_music
 from dotenv import load_dotenv
-from panns_inference import AudioTagging
-import torch
-
 from qdrant_client.http.models import PointStruct
 
 
-load_dotenv()
-
-client = create_quadrant_collection(
-    collection_name="song_vector_collection", embedding_size=2048
-)
-
-at = AudioTagging(checkpoint_path=None, device="cuda")
+device = "cuda" if torch.cuda.is_available() else "cpu"
 
 
-# PANNS Inference
-for i, song in enumerate(os.listdir("music_files/"), start=1):
-    torch.cuda.empty_cache()
-    print(f"Processing song {i}: {song}")
-    file_path = os.path.join("music_files/", song)
-    audio = read_preprocess_music(file_path)
 
-    (_, embedding) = at.inference(audio)
-    embedding = np.squeeze(embedding, axis=0)
+def main():
+    load_dotenv()
 
-    operation_info = client.upsert(
-        collection_name="song_vector_collection",
-        wait=True,
-        points=[
-            PointStruct(id=i, vector=embedding.tolist(), payload={"song_name": song}),
-        ],
+    client = create_quadrant_collection(
+        collection_name="song_vector_collection", embedding_size=768
     )
 
-client.close()
+    files = glob("music_files/*.mp3")
+
+    for file in tqdm(files, desc="Processing files"):
+        torch.cuda.empty_cache()
+        inputs = read_preprocess_music(file)
+        with torch.no_grad():
+            embeddings = model(**inputs).last_hidden_state.mean(dim=1)
+            embedding = embeddings.cpu().numpy().squeeze()
+
+        song_name = os.path.basename(file).split(".")[0]
+        payload = {"song_name": song_name}
+
+        client.upsert(
+            collection_name="song_vector_collection",
+            points=[
+                PointStruct(id=str(uuid.uuid4()), vector=embedding, payload=payload),
+            ],
+        )
+
+
+
+
+if __name__ == "__main__":
+    main()

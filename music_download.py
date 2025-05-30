@@ -45,7 +45,7 @@ async def download_video(video_url: str, output_folder: str):
 
 if __name__ == "__main__":
     playlist_url = (
-        "https://www.youtube.com/playlist?list=PLzKILxYC79RDspOFfHUselpBLOVEOJO_T"
+        "https://www.youtube.com/playlist?list=PLVQ7g3e6O27cH8KG9mktLWH8zcqiwTntP"
     )
     output_folder = "music_files"
 
