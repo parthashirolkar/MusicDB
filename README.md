@@ -1,16 +1,18 @@
-# Music Similarity Search with PANNS and Qdrant
+# Music Similarity Search with wav2vec2 and Qdrant
 
-This project implements a music similarity search system using PANNS (Pediatric Automatic Notification and Notification System) for audio embeddings and Qdrant for vector similarity search.
+This project implements a music similarity search system using the wav2vec2 model (facebook/wav2vec2-base) for audio embeddings and Qdrant for vector similarity search.
 
-The system allows users to download music from YouTube playlists, generate audio embeddings using a pre-trained PANNS model, store these embeddings in a Qdrant database, and perform similarity searches based on input audio files.
+The system allows users to download music from YouTube playlists (using yt_dlp), generate audio embeddings using a pre-trained wav2vec2 model, store these embeddings in a Qdrant database, and perform similarity searches based on input audio files.
 
 ## Repository Structure
 
 ```
 .
 ├── add_music_embeddings.py
+├── emb_test.ipynb
 ├── models.py
 ├── music_download.py
+├── pyproject.toml
 ├── query_database.py
 ├── README.md
 ├── requirements.yaml
@@ -19,10 +21,12 @@ The system allows users to download music from YouTube playlists, generate audio
 
 - `add_music_embeddings.py`: Processes audio files and adds embeddings to the Qdrant database.
 - `models.py`: Defines PyTorch neural network models for sequence-to-sequence tasks and autoencoding.
-- `music_download.py`: Downloads audio files from YouTube playlists and converts them to MP3 format.
+- `music_download.py`: Downloads audio files from YouTube playlists and converts them to MP3 format using yt_dlp.
 - `query_database.py`: Performs similarity searches on the Qdrant database using input audio files.
 - `requirements.yaml`: Conda environment configuration file specifying project dependencies.
+- `pyproject.toml`: Alternative pip/Poetry-based dependency file.
 - `utils.py`: Contains utility functions for audio preprocessing and Qdrant collection creation.
+- `emb_test.ipynb`: (Optional) Notebook for embedding experiments.
 
 ## Usage Instructions
 
@@ -33,6 +37,12 @@ The system allows users to download music from YouTube playlists, generate audio
 
 ```bash
 conda env create -f requirements.yaml
+```
+
+   Or, to use pip/Poetry (Python >=3.12):
+
+```bash
+pip install -r requirements.txt  # or use pyproject.toml with Poetry
 ```
 
 3. Activate the newly created environment:
@@ -48,10 +58,10 @@ conda activate qdrant-db
 
    ```
    QDB_ENDPOINT=your_qdrant_endpoint
-   QDB_API_TOKEN=your_qdrant_api_token
+   QDB_API_KEY=your_qdrant_api_key
    ```
 
-   Replace `your_qdrant_endpoint` and `your_qdrant_api_token` with your actual Qdrant database credentials.
+   Replace `your_qdrant_endpoint` and `your_qdrant_api_key` with your actual Qdrant database credentials.
 
 2. Download music:
    Edit the `music_download.py` file to specify the desired YouTube playlist URL and output folder. Then run:
@@ -83,17 +93,17 @@ conda activate qdrant-db
 
 The data flow in this project follows these steps:
 
-1. Music Download: YouTube playlist videos are downloaded and converted to MP3 format.
+1. Music Download: YouTube playlist videos are downloaded and converted to MP3 format using yt_dlp.
 2. Audio Preprocessing: MP3 files are read and preprocessed using librosa.
-3. Embedding Generation: The PANNS model generates audio embeddings for each preprocessed audio file.
+3. Embedding Generation: The wav2vec2 model generates audio embeddings for each preprocessed audio file.
 4. Database Storage: Embeddings are stored in the Qdrant vector database along with song metadata.
 5. Similarity Search: User-provided audio files are processed and used to query the database for similar songs.
 
 ```
-[YouTube Playlist] -> [MP3 Files] -> [Preprocessed Audio] -> [PANNS Model] -> [Audio Embeddings] -> [Qdrant Database]
+[YouTube Playlist] -> [MP3 Files] -> [Preprocessed Audio] -> [wav2vec2 Model] -> [Audio Embeddings] -> [Qdrant Database]
                                                                                                           ^
                                                                                                           |
-[User Input Audio] -> [Preprocessed Audio] -> [PANNS Model] -> [Query Embedding] -------------------------|
+[User Input Audio] -> [Preprocessed Audio] -> [wav2vec2 Model] -> [Query Embedding] ----------------------|
 ```
 
 ## Troubleshooting
@@ -102,15 +112,15 @@ The data flow in this project follows these steps:
 
 1. CUDA Out of Memory Error:
    - Problem: You may encounter a CUDA out of memory error when processing large audio files.
-   - Solution: Reduce the batch size or use shorter audio segments. You can modify the `read_preprocess_music` function in `utils.py` to limit the audio length.
+   - Solution: Reduce the audio length in the `read_preprocess_music` function in `utils.py`.
 
 2. Qdrant Connection Issues:
    - Problem: Unable to connect to the Qdrant database.
-   - Solution: Double-check your `.env` file to ensure the `QDB_ENDPOINT` and `QDB_API_TOKEN` are correct. Verify your network connection and firewall settings.
+   - Solution: Double-check your `.env` file to ensure the `QDB_ENDPOINT` and `QDB_API_KEY` are correct. Verify your network connection and firewall settings.
 
 3. YouTube Download Failures:
    - Problem: `music_download.py` fails to download some videos.
-   - Solution: Check if the videos are available in your region. You may need to update the `pytube` library or use a VPN if certain videos are geo-restricted.
+   - Solution: Check if the videos are available in your region. You may need to update the `yt_dlp` library or use a VPN if certain videos are geo-restricted.
 
 ### Debugging
 
@@ -127,17 +137,13 @@ logging.basicConfig(level=logging.DEBUG)
 
 ```python
 from qdrant_client import QdrantClient
-client = QdrantClient(os.getenv("QDB_ENDPOINT"), api_key=os.getenv("QDB_API_TOKEN"), prefer_grpc=True, timeout=10, debug=True)
+client = QdrantClient(os.getenv("QDB_ENDPOINT"), api_key=os.getenv("QDB_API_KEY"), prefer_grpc=True, timeout=10, debug=True)
 ```
 
 ### Performance Optimization
 
 To optimize performance:
 
-1. Use batched processing when adding embeddings to Qdrant. Modify `add_music_embeddings.py` to process multiple songs in batches.
-
-2. For large datasets, consider using Qdrant's bulk insert functionality instead of individual upserts.
-
-3. Monitor Qdrant's performance using its built-in metrics. You can access these through the Qdrant web interface or API.
-
-4. If query performance is slow, consider adjusting the `ef_search` parameter in Qdrant's search configuration to balance between search speed and recall.
+1. For large datasets, consider using Qdrant's bulk insert functionality instead of individual upserts.
+2. Monitor Qdrant's performance using its built-in metrics. You can access these through the Qdrant web interface or API.
+3. If query performance is slow, consider adjusting the `ef_search` parameter in Qdrant's search configuration to balance between search speed and recall.
