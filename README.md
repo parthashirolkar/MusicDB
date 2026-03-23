@@ -1,143 +1,151 @@
-# Music Similarity Search with PANNS and Qdrant
+# MusicDB: SOTA Music Similarity Search
 
-This project implements a music similarity search system using PANNS (Pediatric Automatic Notification and Notification System) for audio embeddings and Qdrant for vector similarity search.
+MusicDB is a modern music similarity search system using State-of-the-Art (SOTA) **MERT-v1-95M** embeddings and a local **ChromaDB** vector store. 
 
-The system allows users to download music from YouTube playlists, generate audio embeddings using a pre-trained PANNS model, store these embeddings in a Qdrant database, and perform similarity searches based on input audio files.
+The system provides a clean CLI to download music from YouTube, generate rich audio embeddings with smart chunking, and perform fast similarity searches against a local database.
 
-## Repository Structure
+## 🚀 Key Features
+
+- **MERT Embeddings:** Uses the [MERT-v1-95M](https://huggingface.co/m-a-p/MERT-v1-95M) model for superior acoustic music understanding.
+- **Local Vector DB:** Powered by **ChromaDB** for fast, local persistence without external cloud dependencies.
+- **Async Pipeline:** Concurrent YouTube downloads with `yt-dlp` and `curl-cffi` for high performance and bot-protection bypass.
+- **Smart Chunking:** Automatically splits long audio into overlapping segments (10s) and pools them into a single track-level embedding.
+- **Modern Stack:** Built with `uv`, `Pydantic v2`, `Loguru`, and `Click`.
+
+## 📁 Project Structure
 
 ```
-.
-├── add_music_embeddings.py
-├── models.py
-├── music_download.py
-├── query_database.py
-├── README.md
-├── requirements.yaml
-└── utils.py
+MusicDB/
+├── core/                    # Core abstractions & configuration
+│   ├── config.py            # Pydantic settings & environment loading
+│   └── exceptions.py        # Custom structured error handling
+├── services/                # Business logic layer
+│   ├── chroma_service.py    # Local Vector Database management
+│   ├── mert_service.py      # Embedding generation & chunking logic
+│   ├── audio_service.py     # Librosa-based preprocessing
+│   └── youtube_service.py   # Async yt-dlp downloader
+├── musicdb_cli.py           # Main Unified CLI
+├── music_pipeline.py        # E2E Download + Embed + Index pipeline
+├── query_database.py        # Search & retrieval logic
+├── add_music_embeddings.py   # Script for indexing local audio files
+├── utils.py                 # Common utility functions
+├── pyproject.toml           # UV project configuration
+└── .env                     # Environment variables
 ```
 
-- `add_music_embeddings.py`: Processes audio files and adds embeddings to the Qdrant database.
-- `models.py`: Defines PyTorch neural network models for sequence-to-sequence tasks and autoencoding.
-- `music_download.py`: Downloads audio files from YouTube playlists and converts them to MP3 format.
-- `query_database.py`: Performs similarity searches on the Qdrant database using input audio files.
-- `requirements.yaml`: Conda environment configuration file specifying project dependencies.
-- `utils.py`: Contains utility functions for audio preprocessing and Qdrant collection creation.
+## 🛠️ Installation
 
-## Usage Instructions
+1. **Install uv:**
+   ```bash
+   curl -LsSf https://astral.sh/uv/install.sh | sh
+   ```
 
-### Installation
+2. **Clone and Setup:**
+   ```bash
+   git clone https://github.com/yourusername/MusicDB.git
+   cd MusicDB
+   uv sync
+   ```
 
-1. Ensure you have Conda installed on your system.
-2. Create a new Conda environment using the provided `requirements.yaml` file:
+3. **Configure Environment:**
+   Create a `.env` file (see template below) or run the CLI to generate defaults.
 
+## 💻 Usage
+
+The system is managed entirely through the `musicdb_cli.py`.
+
+### 1. Download and Index from YouTube
 ```bash
-conda env create -f requirements.yaml
+# Process a single video
+uv run python musicdb_cli.py download video "https://www.youtube.com/watch?v=..."
+
+# Process an entire playlist (concurrent downloads)
+uv run python musicdb_cli.py download playlist "https://www.youtube.com/playlist?list=..."
 ```
 
-3. Activate the newly created environment:
-
+### 2. Process Local Files
 ```bash
-conda activate qdrant-db
+# Scan a directory and add all audio files to the database
+uv run python musicdb_cli.py process directory ./my_music
 ```
 
-### Getting Started
-
-1. Set up environment variables:
-   Create a `.env` file in the project root directory with the following content:
-
-   ```
-   QDB_ENDPOINT=your_qdrant_endpoint
-   QDB_API_TOKEN=your_qdrant_api_token
-   ```
-
-   Replace `your_qdrant_endpoint` and `your_qdrant_api_token` with your actual Qdrant database credentials.
-
-2. Download music:
-   Edit the `music_download.py` file to specify the desired YouTube playlist URL and output folder. Then run:
-
-   ```bash
-   python music_download.py
-   ```
-
-3. Add music embeddings to the database:
-   Ensure that the downloaded music files are in the `music_files/` directory, then run:
-
-   ```bash
-   python add_music_embeddings.py
-   ```
-
-4. Perform similarity search:
-   Place the audio file you want to use for the search in the `inference_music_files/` directory, then run:
-
-   ```bash
-   python query_database.py
-   ```
-
-### Configuration Options
-
-- In `add_music_embeddings.py`, you can modify the Qdrant collection name and embedding dimension by changing the `create_quadrant_collection` function call.
-- In `query_database.py`, you can adjust the number of similar songs returned by modifying the `limit` parameter in the `client.search` function call.
-
-## Data Flow
-
-The data flow in this project follows these steps:
-
-1. Music Download: YouTube playlist videos are downloaded and converted to MP3 format.
-2. Audio Preprocessing: MP3 files are read and preprocessed using librosa.
-3. Embedding Generation: The PANNS model generates audio embeddings for each preprocessed audio file.
-4. Database Storage: Embeddings are stored in the Qdrant vector database along with song metadata.
-5. Similarity Search: User-provided audio files are processed and used to query the database for similar songs.
-
-```
-[YouTube Playlist] -> [MP3 Files] -> [Preprocessed Audio] -> [PANNS Model] -> [Audio Embeddings] -> [Qdrant Database]
-                                                                                                          ^
-                                                                                                          |
-[User Input Audio] -> [Preprocessed Audio] -> [PANNS Model] -> [Query Embedding] -------------------------|
+### 3. Search for Similar Songs
+```bash
+# Find songs in your DB that sound like your local audio file
+uv run python musicdb_cli.py search audio ./query_song.mp3
 ```
 
-## Troubleshooting
+### 4. Database Management
+```bash
+# Show collection stats
+uv run python musicdb_cli.py db stats
 
-### Common Issues
-
-1. CUDA Out of Memory Error:
-   - Problem: You may encounter a CUDA out of memory error when processing large audio files.
-   - Solution: Reduce the batch size or use shorter audio segments. You can modify the `read_preprocess_music` function in `utils.py` to limit the audio length.
-
-2. Qdrant Connection Issues:
-   - Problem: Unable to connect to the Qdrant database.
-   - Solution: Double-check your `.env` file to ensure the `QDB_ENDPOINT` and `QDB_API_TOKEN` are correct. Verify your network connection and firewall settings.
-
-3. YouTube Download Failures:
-   - Problem: `music_download.py` fails to download some videos.
-   - Solution: Check if the videos are available in your region. You may need to update the `pytube` library or use a VPN if certain videos are geo-restricted.
-
-### Debugging
-
-To enable verbose logging for better debugging:
-
-1. Add the following lines at the beginning of each Python script:
-
-```python
-import logging
-logging.basicConfig(level=logging.DEBUG)
+# List songs in the database
+uv run python musicdb_cli.py db list
 ```
 
-2. For Qdrant-specific debugging, you can enable debug mode when creating the client:
+## ⚙️ Configuration
 
-```python
-from qdrant_client import QdrantClient
-client = QdrantClient(os.getenv("QDB_ENDPOINT"), api_key=os.getenv("QDB_API_TOKEN"), prefer_grpc=True, timeout=10, debug=True)
+Settings can be managed via the `.env` file:
+
+```ini
+# ChromaDB Settings
+CHROMA_DB_PATH=./chroma_data
+CHROMA_DB_COLLECTION_NAME=song_vector_collection
+
+# MERT Model Settings
+MERT_MODEL_NAME=m-a-p/MERT-v1-95M
+MERT_SAMPLE_RATE=24000
+
+# Processing Settings
+MUSICDB_ENABLE_GPU=true
+AUDIO_CHUNK_DURATION=10
+AUDIO_CHUNK_OVERLAP=2
 ```
 
-### Performance Optimization
+## 🔄 Data Flow
 
-To optimize performance:
+```mermaid
+graph TD
+    %% Define Styles
+    classDef input fill:#e1f5fe,stroke:#3182ce,stroke-width:2px,color:#0277bd
+    classDef process fill:#f3e5f5,stroke:#8e24aa,stroke-width:2px,color:#4a148c
+    classDef model fill:#fff3e0,stroke:#f57c00,stroke-width:2px,color:#e65100
+    classDef db fill:#e8f5e9,stroke:#43a047,stroke-width:2px,color:#1b5e20
 
-1. Use batched processing when adding embeddings to Qdrant. Modify `add_music_embeddings.py` to process multiple songs in batches.
+    %% Nodes
+    A1[YouTube URL]:::input
+    A2[Local Audio File]:::input
+    B[yt-dlp Downloader]:::process
+    C[Audio Waveform]:::process
+    D[Resample to 24kHz & Mono]:::process
+    E[10s Overlapping Chunks]:::process
+    F[MERT-v1-95M]:::model
+    G[768-dim Vectors]:::model
+    H[Mean Pooling]:::process
+    I[Single Track Embedding]:::model
+    J[(ChromaDB)]:::db
+    K[Cosine Similarity Search]:::process
+    L[Top N Similar Songs]:::input
 
-2. For large datasets, consider using Qdrant's bulk insert functionality instead of individual upserts.
+    %% Edges
+    A1 -->|Download| B
+    B --> C
+    A2 -->|Read| C
+    
+    C -->|Preprocess| D
+    D -->|Split| E
+    E -->|Encode| F
+    F -->|Generate| G
+    G -->|Average| H
+    H -->|Output| I
+    
+    I -->|Index| J
+    I -->|Query| K
+    J <-->|Retrieve| K
+    K -->|Return| L
+```
 
-3. Monitor Qdrant's performance using its built-in metrics. You can access these through the Qdrant web interface or API.
+## ⚖️ License
 
-4. If query performance is slow, consider adjusting the `ef_search` parameter in Qdrant's search configuration to balance between search speed and recall.
+MIT

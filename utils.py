@@ -1,31 +1,97 @@
-import os
-from dotenv import load_dotenv
-import numpy as np
-import librosa
-import torch
+"""Utility functions for MusicDB."""
 
-from qdrant_client import QdrantClient
-from qdrant_client.http.models import Distance, VectorParams
-
-load_dotenv()
-device = "cuda" if torch.cuda.is_available() else "cpu"
+import re
+from pathlib import Path
 
 
-def read_preprocess_music(file_path: str) -> np.ndarray:
-    (audio, _) = librosa.load(file_path)
-    audio = audio[None, :]
+def sanitize_filename(filename: str) -> str:
+    """Sanitize a string for use as filename.
 
-    return audio
+    Args:
+        filename: Input string
+
+    Returns:
+        Sanitized filename
+    """
+    # Remove or replace invalid characters
+    sanitized = re.sub(r'[\\/*?:"<>|]', "", filename)
+    # Limit length
+    if len(sanitized) > 200:
+        sanitized = sanitized[:200]
+    return sanitized.strip()
 
 
-def create_quadrant_collection(collection_name: str, embedding_size: int):
-    client = QdrantClient(os.getenv("QDB_ENDPOINT"), api_key=os.getenv("QDB_API_TOKEN"))
+def format_duration(seconds: float | None) -> str:
+    """Format duration in seconds to human readable string.
 
-    if client.collection_exists(collection_name):
-        return client  # Collection already exists, return the client object
+    Args:
+        seconds: Duration in seconds
 
-    client.create_collection(
-        collection_name=collection_name,
-        vectors_config=VectorParams(size=embedding_size, distance=Distance.COSINE),
-    )
-    return client  # Return the client object after creating the collection
+    Returns:
+        Formatted string like "3:45"
+    """
+    if seconds is None:
+        return "unknown"
+
+    minutes = int(seconds // 60)
+    secs = int(seconds % 60)
+    return f"{minutes}:{secs:02d}"
+
+
+def format_number(num: int | None) -> str:
+    """Format large numbers with K/M suffixes.
+
+    Args:
+        num: Number to format
+
+    Returns:
+        Formatted string
+    """
+    if num is None:
+        return "unknown"
+
+    if num >= 1_000_000:
+        return f"{num / 1_000_000:.1f}M"
+    elif num >= 1_000:
+        return f"{num / 1_000:.1f}K"
+    return str(num)
+
+
+def truncate_text(text: str, max_length: int = 100) -> str:
+    """Truncate text to max length.
+
+    Args:
+        text: Input text
+        max_length: Maximum length
+
+    Returns:
+        Truncated text
+    """
+    if len(text) <= max_length:
+        return text
+    return text[: max_length - 3] + "..."
+
+
+def find_audio_files(
+    directory: Path | str, extensions: list[str] | None = None
+) -> list[Path]:
+    """Find all audio files in directory.
+
+    Args:
+        directory: Directory to search
+        extensions: List of extensions to include
+
+    Returns:
+        List of file paths
+    """
+    directory = Path(directory)
+
+    if extensions is None:
+        extensions = [".mp3", ".wav", ".flac", ".m4a", ".ogg", ".aac"]
+
+    files = []
+    for ext in extensions:
+        files.extend(directory.glob(f"*{ext}"))
+        files.extend(directory.glob(f"*{ext.upper()}"))
+
+    return sorted(files)

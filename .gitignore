@@ -115,3 +115,7 @@ dev-data/
 feat_extract_v2.ipynb
 notebooks/
 model-weights/
+
+# Local Vector DB
+chroma_data/
+similarity_comparison.png
