@@ -59,10 +59,10 @@ class YouTubeService:
 
     @staticmethod
     def extract_video_id(url: str) -> str | None:
-        """Extract YouTube video ID from URL.
+        """Extract YouTube video ID from URL or bare video ID.
 
         Args:
-            url: YouTube URL
+            url: YouTube URL or bare video ID
 
         Returns:
             Video ID or None
@@ -76,6 +76,72 @@ class YouTubeService:
             match = re.search(pattern, url)
             if match:
                 return match.group(1)
+
+        if re.match(r"^[a-zA-Z0-9_-]{11}$", url):
+            return url
+
+        return None
+
+    def get_info(self, url: str) -> dict:
+        """Get video info without downloading.
+
+        Args:
+            url: YouTube video URL
+
+        Returns:
+            Dict with video_id, title, and other info
+
+        Raises:
+            DownloadError: If info extraction fails
+        """
+        video_id = self.extract_video_id(url)
+        if not video_id:
+            raise DownloadError(f"Invalid YouTube URL: {url}")
+
+        try:
+            opts = {"quiet": True, "no_warnings": True, "extract_flat": False}
+            with YoutubeDL(opts) as ydl:
+                info = ydl.extract_info(url, download=False)
+                if info is None:
+                    raise DownloadError("Failed to extract video info")
+                return {
+                    "video_id": video_id,
+                    "title": info.get("title", "unknown"),
+                    "duration": info.get("duration"),
+                    "uploader": info.get("uploader"),
+                }
+        except Exception as e:
+            raise DownloadError(f"Failed to get video info: {e}")
+
+    def find_cached_file(self, video_id: str, title: str) -> Path | None:
+        """Find a cached file by title first, then video ID.
+
+        Args:
+            video_id: YouTube video ID
+            title: Video title
+
+        Returns:
+            Path to cached file or None
+        """
+        settings = get_settings()
+        ext = settings.download.audio_format
+
+        title_clean = re.sub(r'[\\/*?:"<>|]', "", title)
+        title_file = self.output_dir / f"{title_clean}.{ext}"
+        if title_file.exists():
+            return title_file
+
+        for file in self.output_dir.glob(f"*.{ext}"):
+            if title_clean.lower() in file.stem.lower():
+                return file
+
+        video_id_file = self.output_dir / f"{video_id}.{ext}"
+        if video_id_file.exists():
+            return video_id_file
+
+        for file in self.output_dir.glob(f"*.{ext}"):
+            if video_id in file.stem:
+                return file
 
         return None
 
@@ -104,6 +170,11 @@ class YouTubeService:
             with YoutubeDL(opts) as ydl:
                 info = ydl.extract_info(url, download=True)
 
+                if info is None:
+                    raise DownloadError("Failed to extract video info")
+
+                title = info.get("title", "unknown")
+
                 # Get the actual file path from yt-dlp info
                 file_path = None
                 if "requested_downloads" in info and info["requested_downloads"]:
@@ -113,17 +184,16 @@ class YouTubeService:
 
                 # Fallback to title-based search if path not found
                 if not file_path or not file_path.exists():
-                    title = info.get("title", "unknown")
                     file_path = self._find_downloaded_file(title)
 
                 if not file_path or not file_path.exists():
                     raise DownloadError(
-                        f"Could not locate downloaded file for: {info.get('title')}"
+                        f"Could not locate downloaded file for: {title}"
                     )
 
                 result = {
                     "video_id": video_id,
-                    "title": info.get("title", "unknown"),
+                    "title": title,
                     "file_path": file_path,
                     "duration": info.get("duration"),
                     "uploader": info.get("uploader"),

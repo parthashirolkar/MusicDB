@@ -6,17 +6,75 @@ import librosa.display
 import matplotlib.pyplot as plt
 import numpy as np
 
-# Add project root to path
 sys.path.insert(0, str(Path(__file__).parent))
 
-from query_database import search_similar_songs
+
+def generate_spectrogram_comparison(
+    query_path: Path | str,
+    match_path: Path | str,
+    query_title: str,
+    match_title: str,
+    similarity: float,
+    start_time: float = 30.0,
+    duration: float = 30.0,
+    sr: int = 24000,
+    n_mels: int = 128,
+    fmax: int = 8000,
+) -> plt.Figure:
+    """Generate a side-by-side mel spectrogram comparison plot.
+
+    Args:
+        query_path: Path to the query audio file.
+        match_path: Path to the matched audio file.
+        query_title: Display title for the query.
+        match_title: Display title for the match.
+        similarity: Similarity score (0-1) to display on the match title.
+        start_time: Start time in seconds for the audio snippet.
+        duration: Duration in seconds for the audio snippet.
+        sr: Sample rate for librosa.
+        n_mels: Number of mel bands.
+        fmax: Maximum frequency for mel spectrogram.
+
+    Returns:
+        matplotlib Figure object.
+    """
+    query_path = Path(query_path)
+    match_path = Path(match_path)
+
+    y_query, _ = librosa.load(query_path, offset=start_time, duration=duration, sr=sr)
+    y_match, _ = librosa.load(match_path, offset=start_time, duration=duration, sr=sr)
+
+    S_query = librosa.feature.melspectrogram(y=y_query, sr=sr, n_mels=n_mels, fmax=fmax)
+    S_query_db = librosa.power_to_db(S_query, ref=np.max)
+
+    S_match = librosa.feature.melspectrogram(y=y_match, sr=sr, n_mels=n_mels, fmax=fmax)
+    S_match_db = librosa.power_to_db(S_match, ref=np.max)
+
+    fig, ax = plt.subplots(nrows=2, sharex=True, sharey=True, figsize=(14, 8))
+
+    img1 = librosa.display.specshow(
+        S_query_db, x_axis="time", y_axis="mel", sr=sr, fmax=fmax, ax=ax[0]
+    )
+    ax[0].set(title=f"Query: {query_title} ({start_time}s-{start_time + duration}s)")
+    ax[0].label_outer()
+
+    librosa.display.specshow(
+        S_match_db, x_axis="time", y_axis="mel", sr=sr, fmax=fmax, ax=ax[1]
+    )
+    ax[1].set(
+        title=f"Match: {match_title} ({start_time}s-{start_time + duration}s) | Sim: {similarity:.3f}"
+    )
+
+    fig.colorbar(img1, ax=ax, format="%+2.0f dB")
+    return fig
 
 
 def plot_spectrograms():
+    from query_database import search_similar_songs
+
     query_file = "music_files/DJ Snake - Let Me Love You ft. Justin Bieber.mp3"
     print(f"Searching for matches to: {query_file}")
 
-    # Get top 2 results. Index 0 is the song itself, index 1 is the 2nd most similar.
     results = search_similar_songs(query_file, n_results=2)
 
     if len(results) < 2:
@@ -31,44 +89,16 @@ def plot_spectrograms():
 
     print(f"2nd most similar song: {match_title} (Similarity: {similarity:.3f})")
 
-    # Load 30 seconds of audio from the middle of the songs (e.g., from 30s to 60s)
-    # This avoids long silent intros and gets right to the music
-    duration_to_plot = 30
-    start_time = 30
-
-    print("Loading audio files (taking a 30s snippet)...")
-    y_query, sr = librosa.load(
-        query_file, offset=start_time, duration=duration_to_plot, sr=24000
+    fig = generate_spectrogram_comparison(
+        query_path=query_file,
+        match_path=match_file,
+        query_title="Shawn Mendes - In My Blood",
+        match_title=match_title,
+        similarity=similarity,
     )
-    y_match, _ = librosa.load(
-        match_file, offset=start_time, duration=duration_to_plot, sr=24000
-    )
-
-    print("Computing Mel spectrograms...")
-    S_query = librosa.feature.melspectrogram(y=y_query, sr=sr, n_mels=128, fmax=8000)
-    S_query_db = librosa.power_to_db(S_query, ref=np.max)
-
-    S_match = librosa.feature.melspectrogram(y=y_match, sr=sr, n_mels=128, fmax=8000)
-    S_match_db = librosa.power_to_db(S_match, ref=np.max)
-
-    print("Generating plot...")
-    fig, ax = plt.subplots(nrows=2, sharex=True, sharey=True, figsize=(14, 8))
-
-    img1 = librosa.display.specshow(
-        S_query_db, x_axis="time", y_axis="mel", sr=sr, fmax=8000, ax=ax[0]
-    )
-    ax[0].set(title=f"Query: Shawn Mendes - In My Blood (30s-60s)")
-    ax[0].label_outer()
-
-    img2 = librosa.display.specshow(
-        S_match_db, x_axis="time", y_axis="mel", sr=sr, fmax=8000, ax=ax[1]
-    )
-    ax[1].set(title=f"Match: {match_title} (30s-60s) | Sim: {similarity:.3f}")
-
-    fig.colorbar(img1, ax=ax, format="%+2.0f dB")
 
     output_img = "similarity_comparison.png"
-    plt.savefig(output_img, dpi=300, bbox_inches="tight")
+    fig.savefig(output_img, dpi=300, bbox_inches="tight")
     print(f"Plot saved to {output_img}")
 
 

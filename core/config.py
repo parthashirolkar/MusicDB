@@ -45,8 +45,8 @@ class ProcessingSettings(BaseSettings):
 
     validate_audio: bool = Field(default=True)
     normalize_embeddings: bool = Field(default=True)
-    chunk_duration: int = Field(default=10, ge=1)
-    chunk_overlap: int = Field(default=2, ge=0)
+    chunk_duration: int = Field(default=20, ge=1)
+    chunk_overlap: int = Field(default=4, ge=0)
     max_duration: float = Field(default=600.0, ge=1)
     enable_gpu: bool = Field(default=True)
 
