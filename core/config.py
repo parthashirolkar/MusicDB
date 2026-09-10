@@ -75,6 +75,31 @@ class DownloadSettings(BaseSettings):
         return v
 
 
+class RerankerSettings(BaseSettings):
+    """Audio feature reranker settings."""
+
+    model_config = SettingsConfigDict(env_prefix="MUSICDB_RERANKER_")
+
+    enabled: bool = Field(default=True)
+    overfetch: int = Field(default=10, ge=0)
+    cosine_weight: float = Field(default=0.60, ge=0, le=1)
+    tempo_weight: float = Field(default=0.10, ge=0, le=1)
+    chroma_weight: float = Field(default=0.15, ge=0, le=1)
+    spectral_weight: float = Field(default=0.10, ge=0, le=1)
+    energy_weight: float = Field(default=0.05, ge=0, le=1)
+
+    @field_validator(
+        "cosine_weight",
+        "tempo_weight",
+        "chroma_weight",
+        "spectral_weight",
+        "energy_weight",
+    )
+    @classmethod
+    def validate_weights_sum(cls, v: float, info) -> float:
+        return v
+
+
 class Settings(BaseSettings):
     """Main application settings."""
 
@@ -82,13 +107,14 @@ class Settings(BaseSettings):
         env_file=".env",
         env_file_encoding="utf-8",
         case_sensitive=False,
-        extra="ignore",  # Allow extra env vars not mapped to fields
+        extra="ignore",
     )
 
     database: DatabaseSettings = Field(default_factory=DatabaseSettings)
     mert: MERTSettings = Field(default_factory=MERTSettings)
     processing: ProcessingSettings = Field(default_factory=ProcessingSettings)
     download: DownloadSettings = Field(default_factory=DownloadSettings)
+    reranker: RerankerSettings = Field(default_factory=RerankerSettings)
     log_level: str = Field(default="INFO")
 
 

@@ -10,6 +10,7 @@ sys.path.insert(0, str(Path(__file__).parent))
 from loguru import logger
 from core.config import get_settings
 from services.chroma_service import ChromaService
+from services.feature_service import FeatureService
 from music_pipeline import MusicPipeline
 from utils import format_duration
 
@@ -112,10 +113,10 @@ def stats(collection: str | None):
     click.echo(f"   Total songs: {count}")
 
 
-@db.command()
+@db.command(name="list")
 @click.option("--limit", "-n", default=20, help="Number of songs to list")
 @click.option("--collection", "-c", help="Collection name")
-def list(limit: int, collection: str | None):
+def list_songs(limit: int, collection: str | None):
     """List songs in the database"""
     db = ChromaService(collection_name=collection)
 
@@ -131,6 +132,56 @@ def list(limit: int, collection: str | None):
         title = meta.get("title", song["id"])
         duration = meta.get("duration_seconds")
         click.echo(f"{i:3d}. {title} ({format_duration(duration)})")
+
+
+@db.command(name="backfill-features")
+@click.option("--collection", "-c", help="Collection name")
+def backfill_features(collection: str | None):
+    """Extract and store audio features for all songs missing them"""
+    db = ChromaService(collection_name=collection)
+    feature_svc = FeatureService()
+
+    songs = list(db.list_songs(limit=99999))
+    if not songs:
+        click.echo("No songs in database.")
+        return
+
+    updated = 0
+    skipped = 0
+
+    for song in songs:
+        meta = song.get("metadata", {})
+        filepath = meta.get("filepath")
+
+        if not filepath:
+            logger.warning(
+                f"Skipping {song['id']}: no filepath (file may have been cleaned up)"
+            )
+            skipped += 1
+            continue
+
+        if "tempo" in meta:
+            logger.debug(f"Skipping {song['id']}: already has features")
+            skipped += 1
+            continue
+
+        try:
+            fp = Path(filepath)
+            if not fp.exists():
+                logger.warning(f"Skipping {song['id']}: file not found at {filepath}")
+                skipped += 1
+                continue
+
+            features = feature_svc.extract_features_from_file(fp)
+            meta.update(features)
+            db.update_metadata(song["id"], meta)
+            updated += 1
+            click.echo(f"  Updated: {song['id']}")
+        except Exception as e:
+            logger.error(f"Failed to process {song['id']}: {e}")
+            skipped += 1
+
+    click.echo(f"\nBackfill complete: {updated} updated, {skipped} skipped")
 
 
 @cli.group()

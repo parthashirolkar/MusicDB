@@ -12,6 +12,7 @@ from services.chroma_service import ChromaService
 from services.mert_service import MERTService
 from services.youtube_service import YouTubeService
 from services.audio_service import AudioService
+from services.feature_service import FeatureService
 
 
 class MusicPipeline:
@@ -34,6 +35,7 @@ class MusicPipeline:
         self.embedder = MERTService()
         self.downloader = YouTubeService(output_dir=output_dir)
         self.audio_svc = AudioService()
+        self.feature_svc = FeatureService()
         self.cleanup = cleanup
 
         logger.info("MusicPipeline initialized")
@@ -89,6 +91,10 @@ class MusicPipeline:
             # Generate embedding
             embedding = self.embedder.embed_file(file_path)
 
+            # Extract audio features for reranking
+            y = self.audio_svc.load_audio(file_path)
+            features = self.feature_svc.extract_features(y, self.audio_svc.sample_rate)
+
             # Prepare metadata
             metadata = {
                 "filename": file_path.name,
@@ -99,6 +105,7 @@ class MusicPipeline:
                 "view_count": download_info.get("view_count"),
                 "filepath": str(file_path) if not self.cleanup else None,
             }
+            metadata.update(features)
 
             # Add to database
             self.db.add_song(video_id, embedding.tolist(), metadata)
@@ -166,6 +173,12 @@ class MusicPipeline:
                     # Validate and embed
                     embedding = self.embedder.embed_file(Path(file_path))
 
+                    # Extract audio features for reranking
+                    y = self.audio_svc.load_audio(Path(file_path))
+                    features = self.feature_svc.extract_features(
+                        y, self.audio_svc.sample_rate
+                    )
+
                     metadata = {
                         "filename": file_path.name,
                         "title": result["title"],
@@ -175,6 +188,7 @@ class MusicPipeline:
                         "view_count": result.get("view_count"),
                         "filepath": str(file_path) if not self.cleanup else None,
                     }
+                    metadata.update(features)
 
                     self.db.add_song(video_id, embedding.tolist(), metadata)
                     logger.success(f"Added: {result['title']}")

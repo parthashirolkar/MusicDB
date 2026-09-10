@@ -85,7 +85,7 @@ def plot_spectrograms():
     match_title = results[1]["metadata"].get(
         "title", results[1]["metadata"].get("filename")
     )
-    similarity = 1 - results[1]["distance"]
+    similarity = results[1].get("reranked_score", 1 - results[1]["distance"])
 
     print(f"2nd most similar song: {match_title} (Similarity: {similarity:.3f})")
 

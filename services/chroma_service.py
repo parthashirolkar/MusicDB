@@ -160,6 +160,23 @@ class ChromaService:
         """
         return self.get_song(song_id) is not None
 
+    def update_metadata(self, song_id: str, metadata: dict) -> None:
+        """Update metadata for an existing song.
+
+        Args:
+            song_id: Song identifier
+            metadata: New metadata dict
+
+        Raises:
+            DatabaseError: If the operation fails
+        """
+        try:
+            collection = self._get_collection()
+            collection.update(ids=[song_id], metadatas=[metadata])
+            logger.debug(f"Updated metadata for: {song_id}")
+        except Exception as e:
+            raise DatabaseError(f"Failed to update metadata for {song_id}: {e}")
+
     def list_songs(self, limit: int = 100, offset: int = 0) -> Iterator[dict]:
         """List all songs in the database.
 

@@ -9,6 +9,7 @@ sys.path.insert(0, str(Path(__file__).parent))
 from services.chroma_service import ChromaService
 from services.mert_service import MERTService
 from services.audio_service import AudioService
+from services.feature_service import FeatureService
 from utils import find_audio_files, sanitize_filename
 
 
@@ -26,6 +27,7 @@ def process_music_directory(
     db = ChromaService(collection_name=collection_name)
     embedder = MERTService()
     audio_svc = AudioService()
+    feature_svc = FeatureService()
 
     # Find audio files
     music_dir = Path(music_dir)
@@ -52,6 +54,10 @@ def process_music_directory(
             embedding = embedder.embed_file(file_path)
             logger.debug(f"Generated embedding: {embedding.shape}")
 
+            # Extract audio features for reranking
+            y = audio_svc.load_audio(file_path)
+            features = feature_svc.extract_features(y, audio_svc.sample_rate)
+
             # Create metadata
             song_id = sanitize_filename(file_path.stem)
             metadata = {
@@ -59,6 +65,7 @@ def process_music_directory(
                 "filepath": str(file_path),
                 "duration_seconds": audio_svc.get_duration(file_path),
             }
+            metadata.update(features)
 
             # Check for duplicates
             if db.song_exists(song_id):

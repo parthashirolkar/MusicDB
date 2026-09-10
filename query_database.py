@@ -9,6 +9,10 @@ sys.path.insert(0, str(Path(__file__).parent))
 from loguru import logger
 from services.chroma_service import ChromaService
 from services.mert_service import MERTService
+from services.audio_service import AudioService
+from services.feature_service import FeatureService
+from services.reranker_service import AudioFeatureReranker
+from core.config import get_settings
 from utils import format_duration
 
 
@@ -34,14 +38,28 @@ def search_similar_songs(
     # Initialize services
     db = ChromaService(collection_name=collection_name)
     embedder = MERTService()
+    settings = get_settings()
 
     try:
         # Generate query embedding
         logger.info(f"Processing query: {query_path.name}")
         query_embedding = embedder.embed_file(query_path)
 
-        # Search database
-        results = db.search_similar(query_embedding.tolist(), n_results=n_results)
+        overfetch = settings.reranker.overfetch if settings.reranker.enabled else 0
+        results = db.search_similar(
+            query_embedding.tolist(), n_results=n_results + overfetch
+        )
+
+        if settings.reranker.enabled and results:
+            audio_svc = AudioService()
+            feature_svc = FeatureService()
+            reranker = AudioFeatureReranker()
+
+            query_y = audio_svc.load_audio(query_path)
+            query_features = feature_svc.extract_features(
+                query_y, audio_svc.sample_rate
+            )
+            results = reranker.rerank(query_features, results, top_n=n_results)
 
         return results
 
@@ -66,7 +84,7 @@ def print_results(results: list[dict]) -> None:
         metadata = result.get("metadata", {})
         filename = metadata.get("filename", "Unknown")
         duration = metadata.get("duration_seconds")
-        similarity = 1 - result["distance"]  # Convert distance to similarity
+        similarity = result.get("reranked_score", 1 - result["distance"])
 
         print(f"{i}. {filename}")
         print(f"   Similarity: {similarity:.3f}")
